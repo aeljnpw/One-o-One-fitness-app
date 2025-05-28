@@ -21,47 +21,57 @@ type Exercise = {
 };
 
 export default function EquipmentDetail() {
-  const { id } = useLocalSearchParams();
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchEquipmentDetails();
-  }, [id]);
-
-  async function fetchEquipmentDetails() {
+  async function fetchEquipmentDetails(equipmentId: string) {
     try {
       setLoading(true);
+      setError(null); 
       
-      // Fetch equipment details
       const { data: equipmentData, error: equipmentError } = await supabase
         .from('equipment')
         .select('*')
-        .eq('id', id)
+        .eq('id', equipmentId)
         .single();
 
-      if (equipmentError) throw equipmentError;
+      if (equipmentError) {
+        console.error('Supabase error fetching equipment:', equipmentError);
+        throw equipmentError;
+      }
       setEquipment(equipmentData);
 
-      // Fetch related exercises
       const { data: exercisesData, error: exercisesError } = await supabase
         .from('exercises')
         .select('id, title, difficulty, duration, primary_muscles, secondary_muscles')
-        .eq('equipment_id', id);
+        .eq('equipment_id', equipmentId);
 
-      if (exercisesError) throw exercisesError;
+      if (exercisesError) {
+        console.error('Supabase error fetching exercises:', exercisesError);
+        throw exercisesError;
+      }
       setExercises(exercisesData || []);
-      setError(null);
-    } catch (err) {
-      setError('Failed to load equipment details. Please try again.');
-      console.error('Error:', err);
+      
+    } catch (err: any) {
+      setError(err.message || 'Failed to load equipment details. Please try again.');
     } finally {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (id && typeof id === 'string') {
+      fetchEquipmentDetails(id);
+    } else {
+      setLoading(false);
+      setError('Equipment ID is missing or invalid.');
+      setEquipment(null);
+    }
+  }, [id]);
 
   if (loading) {
     return (
@@ -71,14 +81,33 @@ export default function EquipmentDetail() {
     );
   }
 
-  if (error || !equipment) {
+  if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error || 'Equipment not found'}</Text>
+        <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={fetchEquipmentDetails}>
+          onPress={() => {
+            if (id && typeof id === 'string') {
+              fetchEquipmentDetails(id);
+            }
+          }}
+        >
           <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+  
+  if (!equipment) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Equipment not found.</Text>
+         <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => router.back()}
+         >
+          <Text style={styles.retryButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -93,7 +122,8 @@ export default function EquipmentDetail() {
             <View style={styles.header}>
               <TouchableOpacity
                 style={styles.backButton}
-                onPress={() => router.back()}>
+                onPress={() => { router.back(); }}
+              >
                 <ChevronLeft size={24} color="#18181b" />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>{equipment.name}</Text>
@@ -112,14 +142,15 @@ export default function EquipmentDetail() {
 
         <View style={styles.exercisesSection}>
           <Text style={styles.sectionTitle}>Available Exercises</Text>
-          {exercises.length === 0 ? (
+          {!exercises || exercises.length === 0 ? (
             <Text style={styles.noExercisesText}>No exercises available for this equipment yet.</Text>
           ) : (
-            exercises.map((exercise) => (
+            (exercises || []).map((exercise) => (
               <TouchableOpacity
                 key={exercise.id}
                 style={styles.exerciseCard}
-                onPress={() => router.push(`/exercise/${exercise.id}`)}>
+                onPress={() => { router.push(`/exercise/${exercise.id}`); }}
+              >
                 <View>
                   <Text style={styles.exerciseName}>{exercise.title}</Text>
                   <Text style={styles.exerciseDetails}>
@@ -127,7 +158,7 @@ export default function EquipmentDetail() {
                   </Text>
                 </View>
                 <View style={styles.muscleGroups}>
-                  {exercise.primary_muscles.map((muscle, index) => (
+                  {(exercise.primary_muscles || []).map((muscle, index) => (
                     <View key={index} style={styles.muscleTag}>
                       <Text style={styles.muscleTagText}>{muscle}</Text>
                     </View>
@@ -181,7 +212,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 60, 
     paddingHorizontal: 16,
     paddingBottom: 16,
     backgroundColor: '#ffffff',
@@ -189,11 +220,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f4f4f5',
   },
   backButton: {
-    padding: 8,
+    padding: 8, 
     marginRight: 8,
   },
   headerTitle: {
-    flex: 1,
+    flex: 1, 
     fontSize: 20,
     fontFamily: 'Inter-SemiBold',
     color: '#18181b',
@@ -254,17 +285,17 @@ const styles = StyleSheet.create({
   muscleGroups: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   muscleTag: {
-    backgroundColor: '#e0e7ff',
-    paddingHorizontal: 8,
+    backgroundColor: '#e4e4e7',
+    borderRadius: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 16,
   },
   muscleTagText: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
-    color: '#4f46e5',
+    color: '#3f3f46',
   },
 });

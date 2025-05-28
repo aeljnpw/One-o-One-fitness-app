@@ -23,7 +23,7 @@ export default function EquipmentCatalog() {
   const fetchEquipment = useCallback(async () => {
     try {
       setLoading(true);
-      let query = supabase.from('equipment').select('*');
+      let query = supabase.from('equipment').select('*').limit(30);
       
       if (searchQuery) {
         query = query.ilike('name', `%${searchQuery}%`);
@@ -35,13 +35,20 @@ export default function EquipmentCatalog() {
 
       const { data, error: fetchError } = await query;
       
+      console.log(
+        'Supabase fetch attempt with .limit(30). Data received:',
+         data ? data.length : 0, 
+        'items. Error:', 
+        fetchError
+      );
+
       if (fetchError) throw fetchError;
       
       setEquipment(data || []);
       setError(null);
     } catch (err) {
       setError('Failed to load equipment. Please try again.');
-      console.error('Error:', err);
+      console.error('Error fetching equipment:', err);
     } finally {
       setLoading(false);
     }
